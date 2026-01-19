@@ -1,0 +1,102 @@
+import streamlit as st
+import requests
+import os
+import random
+from dotenv import load_dotenv
+
+# ----------------------------
+# 🔑 Load environment variables
+# ----------------------------
+load_dotenv()
+API_KEY = os.getenv("AZURE_API_KEY")
+ENDPOINT = os.getenv("AZURE_ENDPOINT")
+
+# ----------------------------
+# 💡 Predefined health tips
+# ----------------------------
+HEALTH_TIPS = [
+    "💧 Drink at least 8 glasses of water daily.",
+    "🥦 Eat more fruits and vegetables to strengthen your immune system.",
+    "🏃‍♂️ Stay active — even a 20-minute walk helps.",
+    "😴 Get 7–8 hours of quality sleep every night.",
+    "🧘 Practice mindfulness or meditation for stress relief.",
+    "🚭 Avoid smoking and limit alcohol consumption.",
+    "💊 Never self-medicate — consult a doctor for severe symptoms.",
+    "🧴 Wash your hands regularly to prevent infection.",
+    "☀️ Get some sunlight for vitamin D.",
+    "🪥 Maintain good oral hygiene."
+]
+
+# ----------------------------
+# 🧠 Function to call Azure model
+# ----------------------------
+def get_ai_response(user_message):
+    headers = {
+        "Content-Type": "application/json",
+        "api-key": API_KEY
+    }
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": "You are an AI health assistant that provides possible causes and lifestyle suggestions based on symptoms."},
+            {"role": "user", "content": user_message}
+        ],
+        "max_tokens": 300
+    }
+
+    try:
+        response = requests.post(ENDPOINT, headers=headers, json=payload)
+        response.raise_for_status()
+        result = response.json()
+        return result["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"⚠️ Something went wrong: {str(e)}"
+
+# ----------------------------
+# 🧾 Initialize chat history
+# ----------------------------
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+# ----------------------------
+# 🎨 Streamlit Interface
+# ----------------------------
+st.title("🏥 AI Health Symptom Checker + Awareness Bot")
+st.write("Describe your symptoms below — AI will suggest possible causes and healthy habits.")
+
+symptoms = st.text_area("🩺 Enter your symptoms:")
+
+# 🧠 Add severity slider
+severity = st.slider("Rate your symptom severity (1 = mild, 10 = severe):", 1, 10, 5)
+
+if st.button("Check Now"):
+    if symptoms.strip():
+        with st.spinner("Analyzing your symptoms..."):
+            user_message = f"My symptoms: {symptoms}. Severity level: {severity}/10."
+            reply = get_ai_response(user_message)
+
+            # Save to chat history
+            st.session_state.chat_history.append({"user": symptoms, "severity": severity, "ai": reply})
+
+            # Display response
+            st.markdown("### 🧠 Possible Analysis:")
+            st.write(reply)
+
+            # 🩵 Add random health tip
+            st.markdown("---")
+            st.markdown("### 💡 Health Tip of the Day:")
+            st.success(random.choice(HEALTH_TIPS))
+
+    else:
+        st.warning("Please enter your symptoms before clicking.")
+
+# ----------------------------
+# 💬 Display Chat History
+# ----------------------------
+if st.session_state.chat_history:
+    st.markdown("---")
+    st.markdown("### 🗂️ Previous Chats")
+    for chat in reversed(st.session_state.chat_history):
+        st.markdown(f"**🧍‍♂️ You:** {chat['user']} (Severity: {chat['severity']}/10)")
+        st.markdown(f"**🤖 AI:** {chat['ai']}")
+        st.markdown("---")
